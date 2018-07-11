@@ -22,4 +22,4 @@ make O=../build/$KVER tinyconfig
 cp ../config_kernel build/$KVER/.config
 
 echo "Compilation ..."
-make O=../build/$KVER tinyconfig 
+make O=../build/$KVER
