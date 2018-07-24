@@ -1,12 +1,14 @@
 #!/bin/bash
 
+#/!\ not tested yet
+
 KURL="$1"
 #https://cdn.kernel.org/pub/linux/kernel/v4.x/linux-4.17.6.tar.xz
 
 KVER=$(echo $KURL | egrep -o 'linux-[0-9.]{6}')
 KFILE=${KVER}.tar.xz
 
-echo 'Downloading from $KURL ... "
+echo "Downloading from $KURL ... "
 wget $KURL --quiet
 
 echo "Uncompressing..."
