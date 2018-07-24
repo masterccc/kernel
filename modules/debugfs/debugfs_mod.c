@@ -101,8 +101,8 @@ static ssize_t foo_read(struct file *file, char __user *buf,
         copy_to_user(buf, data, PAGE_SIZE);
         up(&sem); /* Relache le verrou */
 
-		*ppos += count;
-		return count;
+        *ppos += count;
+        return count;
 }
 
 
@@ -110,13 +110,13 @@ static ssize_t foo_write(struct file *file, char const __user *buf,
                         size_t count, loff_t *ppos)
 {
 
-		down(&sem);
-		memset(data, 0, PAGE_SIZE);
+        down(&sem);
+        memset(data, 0, PAGE_SIZE);
         copy_from_user(data, buf, (count > PAGE_SIZE ? PAGE_SIZE : count));
         printk("Valeur stockée : %s (%ld)\n", data, count);
         up(&sem);
 
-        return count; /* Nb d'octets lu */
+        return count; /* Nb d'octets lul */
 }
 
 static const struct file_operations foo_fops = {
@@ -182,7 +182,7 @@ static int __init mydbgfs_init(void)
         debugfs_foo = debugfs_create_file("foo", 0644, my_debug_fs_root, NULL, &foo_fops);
         if(!debugfs_foo)
                 goto Fail;
-		
+                
         memset(data, 0, PAGE_SIZE);
 
         return 0 ;
