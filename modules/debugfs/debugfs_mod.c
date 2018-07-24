@@ -1,16 +1,7 @@
 /*
 TODO
   
-  - The file "id" must be readable and writable by any user.
-  - The file "foo" needs to be writable only by root, but readable by
-    anyone.  When writing to it, the value must be stored, up to one
-    page of data.  When read, which can be done by any user, the value
-    must be returned that is stored it it.  Properly handle the fact
-    that someone could be reading from the file while someone else is
-    writing to it (oh, a locking hint!)
-  - When the module is unloaded, all of the debugfs files are cleaned
-    up, and any memory allocated is freed.
-
+  
 
 DONE
 - Take the kernel module you wrote for task 01, and modify it to be
@@ -20,6 +11,14 @@ DONE
     logic there
 - The file "jiffies" is to be read only by any user, and when read,
     should return the current value of the jiffies kernel timer.
+- When the module is unloaded, all of the debugfs files are cleaned
+    up, and any memory allocated is freed.
+- The file "foo" needs to be writable only by root, but readable by
+    anyone.  When writing to it, the value must be stored, up to one
+    page of data.  When read, which can be done by any user, the value
+    must be returned that is stored it it.  Properly handle the fact
+    that someone could be reading from the file while someone else is
+    writing to it (oh, a locking hint!)
 
 
 http://blog.techveda.org/debugfs/
@@ -39,10 +38,18 @@ http://blog.techveda.org/debugfs/
 #define MWORD "abcdef"
 #define MWORD_LEN 6
 
+#define MAX_NUMBER_SIZE 15 
 #define DBG_FOLDER "eudyptula"
+
 
 static struct timer_list my_timer;
 static struct dentry *my_debug_fs_root;
+
+/* Equivalent mutex http://tuxthink.blogspot.com/2011/05/using-semaphores-in-linux.html */
+static DEFINE_SEMAPHORE(sem);
+
+static char data[PAGE_SIZE];
+/* begin id debugfs */
 
 static ssize_t id_read(struct file *file, char __user *buf,
                         size_t count, loff_t *ppos)
@@ -80,8 +87,47 @@ static const struct file_operations id_fops = {
         .write        = id_write,
         .read         = id_read
 };
+/* end id debugfs */
+
+/* begin foo debugfs */
+
+static ssize_t foo_read(struct file *file, char __user *buf,
+                        size_t count, loff_t *ppos)
+{
+
+        if (*ppos != 0)
+                return 0;
+        down(&sem); /* Place le verrou */
+        copy_to_user(buf, data, PAGE_SIZE);
+        up(&sem); /* Relache le verrou */
+
+		*ppos += count;
+		return count;
+}
 
 
+static ssize_t foo_write(struct file *file, char const __user *buf,
+                        size_t count, loff_t *ppos)
+{
+
+		down(&sem);
+		memset(data, 0, PAGE_SIZE);
+        copy_from_user(data, buf, (count > PAGE_SIZE ? PAGE_SIZE : count));
+        printk("Valeur stockée : %s (%ld)\n", data, count);
+        up(&sem);
+
+        return count; /* Nb d'octets lu */
+}
+
+static const struct file_operations foo_fops = {
+        .owner        = THIS_MODULE,
+        .write        = foo_write,
+        .read         = foo_read
+};
+
+/* end foo debugfs */
+
+/* begin jiffies debugfs */
 static ssize_t jiffies_read(struct file *file, char __user *buf,
                         size_t count, loff_t *ppos)
 {
@@ -104,6 +150,7 @@ static const struct file_operations jiffies_fops = {
         .read        = jiffies_read
 };
 
+/* end jiffies debugfs */
 
 void my_timer_callback( unsigned long data )
 {
@@ -132,9 +179,11 @@ static int __init mydbgfs_init(void)
         if(!debugfs_id)
                 goto Fail;
 
-        debugfs_foo = debugfs_create_file("foo", 0644, my_debug_fs_root, NULL, &jiffies_fops);
+        debugfs_foo = debugfs_create_file("foo", 0644, my_debug_fs_root, NULL, &foo_fops);
         if(!debugfs_foo)
                 goto Fail;
+		
+        memset(data, 0, PAGE_SIZE);
 
         return 0 ;
 
@@ -151,6 +200,7 @@ static void __exit mydbgfs_exit(void)
         int ret;
 
         printk("Removing eudyptula debugfs ...");
+
         debugfs_remove_recursive(my_debug_fs_root);
         ret = del_timer(&my_timer);
         if(ret)
